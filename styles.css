@@ -1,0 +1,559 @@
+/* Estilos globales */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f5f5f5;
+    overflow: hidden;
+    height: 100vh;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Barra de herramientas */
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    background-color: #2c3e50;
+    color: #ecf0f1;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    flex-wrap: wrap;
+}
+
+.tool-group {
+    display: flex;
+    gap: 8px;
+    margin: 2px 0;
+}
+
+.btn {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn:hover {
+    background-color: #2980b9;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.btn-danger {
+    background-color: #e74c3c;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+}
+
+.btn-secondary {
+    background-color: #7f8c8d;
+}
+
+.btn-secondary:hover {
+    background-color: #6c7a7c;
+}
+
+.btn-small {
+    padding: 3px 8px;
+    font-size: 12px;
+}
+
+.icon {
+    font-size: 16px;
+}
+
+/* Estructura principal */
+.main-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Panel de detalles del punto */
+.point-details-sidebar {
+    width: 350px;
+    background-color: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease;
+    z-index: 5;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background-color: #e9ecef;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.sidebar-close-btn {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #6c757d;
+}
+
+.sidebar-close-btn:hover {
+    color: #343a40;
+}
+
+.point-details-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.empty-details-message {
+    text-align: center;
+    color: #6c757d;
+    margin: 20px 0;
+    font-style: italic;
+}
+
+.point-navigation {
+    display: flex;
+    justify-content: space-between;
+    padding: 15px;
+    border-top: 1px solid #dee2e6;
+    background-color: #e9ecef;
+}
+
+.point-details-content h3 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.point-details-content p {
+    margin-bottom: 20px;
+    color: #495057;
+}
+
+.point-details-image {
+    display: block;
+    max-width: 150%;
+    max-height: 350px;
+    margin: 0 auto 20px auto; /* Centrado con margen inferior */
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    object-fit: contain; /* Asegura que la imagen completa sea visible */
+    background-color: #f0f0f0; /* Fondo para imágenes con transparencia */
+    padding: 5px; /* Espacio interno */
+}
+
+.point-description-box {
+    background-color: #f0f0f0;
+    border-radius: 6px;
+    padding: 15px;
+    margin: 15px 0;
+    border-left: 4px solid #3498db; /* Borde lateral azul para estilo */
+    font-size: 14px;
+    line-height: 1.5;
+    color: #333;
+}
+
+/* Área de trabajo */
+.workspace {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background-color: #ddd;
+    background-image: 
+        linear-gradient(45deg, #ccc 25%, transparent 25%),
+        linear-gradient(-45deg, #ccc 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ccc 75%),
+        linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+
+.image-container {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: grab;
+}
+
+.image-container.grabbing {
+    cursor: grabbing;
+}
+
+.image-container.adding-point {
+    cursor: crosshair;
+}
+
+.image-wrapper {
+    position: relative;
+    transform-origin: center;
+    transition: transform 0.1s ease-out;
+}
+
+.background-image {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.points-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.point {
+    position: absolute;               
+    width: 11px;                     
+    height: 11px;                     
+    margin-left: -5.5px;              
+    margin-top: -11px;                
+    background-color: rgba(231, 76, 60, 0.9); 
+    border: 1px solid white;         
+    border-radius: 50%;              
+    cursor: pointer;                 
+    pointer-events: auto;            
+    transition: transform 0.2s, background-color 0.2s; 
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3); 
+    z-index: 5;                      
+    display: flex;                   
+    align-items: center;             
+    justify-content: center;         
+    color: white;                    
+    font-weight: bold;               
+    font-size: 6px;                 
+
+    padding: 0 !important; /* Elimina cualquier padding */
+    line-height: 1; /* Evita espacio adicional */
+    font-family: Arial, sans-serif; /* Fuente consistente */
+    text-align: center; /* Doble seguridad para centrado */
+    box-sizing: border-box; /* Incluye border en el tamaño total */
+}
+
+.point::after {
+    content: "";
+    position: absolute;
+    top: 100%; /* Coloca el triángulo justo debajo del círculo */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 2px solid transparent;  /* Mitad del ancho del círculo */
+    border-right: 2px solid transparent; /* Mitad del ancho del círculo */
+    border-top: 2px solid white; 	 /* Altura proporcional, mismo color */
+    pointer-events: none; /* Evita que el triángulo interfiera con los eventos del ratón */
+}
+
+.point:hover {
+    /*transform: scale(1);          				Agranda el punto un (desactivat)% */
+    background-color: #e74c3c;       				/* Cambia el fondo a un rojo más fuerte */
+    z-index: 6;                      				/* Lo pone por encima de los demás puntos */
+}
+
+
+.point.highlight {
+    /*transform: scale(1);           				 Aumenta su tamaño un 30% (desactivat) */
+    background-color: #3498db;       				/* Cambia a azul */
+    z-index: 7;                      				/* Asegura que esté por encima del resto */
+}
+
+.startup-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.2);
+}
+
+.startup-message h2 {
+    margin-bottom: 15px;
+    color: #2c3e50;
+}
+
+.startup-message .arrow {
+    font-size: 30px;
+    margin-top: 20px;
+    animation: bounce 1s infinite alternate;
+}
+
+@keyframes bounce {
+    from { transform: translateY(0); }
+    to { transform: translateY(-10px); }
+}
+
+/* Modales */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    position: relative;
+}
+
+.confirm-modal-content {
+    max-width: 400px;
+    padding: 20px;
+}
+
+.close-btn {
+    position: absolute;
+    right: 15px;
+    top: 10px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #7f8c8d;
+}
+
+.close-btn:hover {
+    color: #2c3e50;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+/* Formularios */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+input[type="text"],
+textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* Imágenes en puntos */
+.point-image-container {
+    margin: 15px 0;
+    text-align: center;
+}
+
+.point-image {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.point-image-preview-container {
+    margin-top: 10px;
+    text-align: center;
+}
+
+/* Utilidades */
+.hidden {
+    display: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .toolbar {
+        padding: 5px;
+    }
+    
+    .tool-group {
+        margin: 2px 0;
+    }
+    
+    .btn {
+        padding: 5px 8px;
+        font-size: 12px;
+    }
+    
+    .icon {
+        font-size: 14px;
+    }
+    
+    .modal-content {
+        width: 95%;
+    }
+    
+    .point-details-sidebar {
+        position: absolute;
+        height: 100%;
+        width: 380%;
+        transform: translateX(-100%);
+    }
+    
+    .point-details-sidebar.visible {
+        transform: translateX(0);
+    }
+    
+    .point-navigation {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .point-navigation .btn {
+        width: 100%;
+    }
+}
+
+.point-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #dee2e6;
+}
+
+.point-actions .btn {
+    flex: 1;
+    text-align: center;
+}
+
+.point.dragging {
+    opacity: 0.8;
+    /*transform: scale(1.3);  */
+    z-index: 10;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+}
+
+.add-point-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 2px dashed rgba(52, 152, 219, 0.7);
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.point-preview {
+    position: absolute;
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 4;
+    background-color: #3498db;
+}
+
+/* Estilos para el botón y modal de configuración */
+/* Modal de configuración específico */
+#config-modal .modal-content {
+    max-width: 400px;
+    padding: 20px;
+}
+
+#config-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+#config-modal .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+#config-btn {
+    font-size: 1em;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-group input[type="number"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+
+}

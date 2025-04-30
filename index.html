@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Puntos Interactivos</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Barra de herramientas -->
+        <div class="toolbar">
+            <div class="tool-group">
+                <label for="bg-upload" class="btn" title="Subir imagen de fondo">
+                    <span class="icon">🖼️</span> Imagen
+                </label>
+                <input type="file" id="bg-upload" accept="image/jpeg, image/png" hidden>
+                
+                <button id="add-point-btn" class="btn" disabled title="Añadir punto">
+                    <span class="icon">📍</span> Añadir
+                </button>
+            </div>
+
+            <div class="tool-group">
+                <button id="zoom-in-btn" class="btn" disabled title="Acercar">
+                    <span class="icon">➕</span>
+                </button>
+                <button id="zoom-out-btn" class="btn" disabled title="Alejar">
+                    <span class="icon">➖</span>
+                </button>
+                <button id="zoom-reset-btn" class="btn" disabled title="Restablecer zoom">
+                    <span class="icon">🔍</span>
+                </button>
+            </div>
+
+            <div class="tool-group">
+                <button id="toggle-details-btn" class="btn" disabled title="Mostrar/Ocultar panel de detalles">
+                    <span class="icon">📝</span> Detalles
+                </button>
+            </div>
+
+            <div class="tool-group">
+                <button id="save-btn" class="btn" disabled title="Guardar proyecto">
+                    <span class="icon">💾</span> Guardar
+                </button>
+                <label for="load-upload" class="btn" title="Cargar proyecto">
+                    <span class="icon">📂</span> Cargar
+                </label>
+                <input type="file" id="load-upload" accept="application/json" hidden>
+            </div>
+		<button id="config-btn" class="btn" title="Configuración">
+    		    <span class="icon">⚙️</span> Enumeración
+		</button>
+        </div>
+        <div class="main-container">
+            <!-- Panel de detalles del punto -->
+            <div id="point-details-sidebar" class="point-details-sidebar hidden">
+                <div class="sidebar-header">
+                    <h3>Detalles del Punto</h3>
+                    <button id="close-details-btn" class="sidebar-close-btn">&times;</button>
+                </div>
+                <div id="point-details-content" class="point-details-content">
+                    <div class="empty-details-message">Selecciona un punto para ver sus detalles</div>
+                </div>
+                <div class="point-navigation">
+                    <button id="prev-point-btn" class="btn" disabled><span class="icon">◀️</span> Anterior</button>
+                    <button id="next-point-btn" class="btn" disabled>Siguiente <span class="icon">▶️</span></button>
+                </div>
+            </div>
+
+            <!-- Área de trabajo (imagen + puntos) -->
+            <div class="workspace">
+                <div id="image-container" class="image-container">
+                    <div id="image-wrapper" class="image-wrapper">
+                        <img id="background-image" class="background-image hidden" alt="Imagen de fondo">
+                        <div id="points-container" class="points-container"></div>
+			<div id="add-point-indicator" class="add-point-indicator hidden"></div>
+			<div id="point-preview" class="point point-preview hidden">+</div>
+                    </div>
+                </div>
+                
+                <div id="startup-message" class="startup-message">
+                    <h2>Editor de Puntos Interactivos</h2>
+                    <p>Comienza subiendo una imagen de fondo desde la barra de herramientas</p>
+                    <div class="arrow">⬆️</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para punto interactivo (ver/editar) -->
+    <div id="point-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <div class="modal-body">
+                <div id="point-view-mode">
+                    <h3 id="point-title">Punto</h3>
+                    <div class="point-image-container">
+                        <img id="point-image-view" class="point-image hidden" alt="Imagen del punto">
+                    </div>
+                    <p id="point-description"></p>
+                    <div class="modal-buttons">
+                        <button id="edit-point-btn" class="btn">Editar</button>
+                        <button id="delete-point-btn" class="btn btn-danger">Eliminar</button>
+                    </div>
+                </div>
+                
+                <div id="point-edit-mode" class="hidden">
+                    <h3>Editar punto</h3>
+                    <div class="form-group">
+                        <label for="point-title-input">Título:</label>
+                        <input type="text" id="point-title-input" placeholder="Título del punto">
+                    </div>
+                    <div class="form-group">
+                        <label for="point-desc-input">Descripción:</label>
+                        <textarea id="point-desc-input" placeholder="Describe este punto..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="point-image-upload">Imagen (opcional):</label>
+                        <input type="file" id="point-image-upload" accept="image/jpeg, image/png">
+                        <div class="point-image-preview-container">
+                            <img id="point-image-preview" class="point-image hidden" alt="Vista previa">
+                            <button id="remove-image-btn" class="btn btn-small btn-danger hidden">Eliminar imagen</button>
+                        </div>
+                    </div>
+                    <div class="modal-buttons">
+                        <button id="save-point-btn" class="btn">Guardar</button>
+                        <button id="cancel-edit-btn" class="btn btn-secondary">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Modal de configuración -->
+<div id="config-modal" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Configuración</h2>
+            <span class="close-btn">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="starting-number">Comenzar a numerar desde:</label>
+                <input type="number" id="starting-number" min="1" value="1">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="save-config-btn" class="btn">Guardar</button>
+            <button id="cancel-config-btn" class="btn">Cancelar</button>
+        </div>
+    </div>
+</div>
+    <!-- Modal de confirmación -->
+    <div id="confirm-modal" class="modal hidden">
+        <div class="modal-content confirm-modal-content">
+            <h3 id="confirm-title">Confirmar</h3>
+            <p id="confirm-message">¿Estás seguro?</p>
+            <div class="modal-buttons">
+                <button id="confirm-yes-btn" class="btn btn-danger">Sí</button>
+                <button id="confirm-no-btn" class="btn">No</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
