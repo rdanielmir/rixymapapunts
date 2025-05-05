@@ -557,3 +557,50 @@ textarea {
     font-size: 14px;
 
 }
+
+/* Visor de imágenes */
+.image-viewer-content {
+    position: relative;
+    background-color: transparent;
+    max-width: 90%;
+    max-height: 90vh;
+    text-align: center;
+}
+
+.viewer-image {
+    max-width: 100%;
+    max-height: calc(90vh - 100px);
+    object-fit: contain;
+    background-color: #000;
+    border-radius: 4px;
+}
+
+.viewer-navigation {
+    margin-top: 15px;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+#viewer-point-title {
+    color: white;
+    margin-bottom: 15px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+/* Fondo oscuro para el visor */
+#image-viewer-modal.modal {
+    background-color: rgba(0, 0, 0, 0.9);
+}
+
+/* Estilos para el encabezado del punto */
+.point-header {
+    margin-bottom: 15px;
+}
+
+.point-number {
+    font-size: 14px;
+    color: #7f8c8d;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
