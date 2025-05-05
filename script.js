@@ -71,6 +71,10 @@ const state = {
     backgroundDataUrl: null,
     naturalWidth: 0,
     naturalHeight: 0,
+
+
+    lastKeyPressTime: 0,
+    currentViewerPointId: null,
     
     // Estado de zoom y desplazamiento
     scale: 1,
@@ -122,6 +126,35 @@ function setupEventListeners() {
     // Eventos para cargar imágenes
     bgUpload.addEventListener('change', handleBackgroundUpload);
     loadUpload.addEventListener('change', handleProjectLoad);
+
+
+    // Eventos del visor de imágenes
+    document.getElementById('close-image-viewer').addEventListener('click', closeImageViewer);
+    document.getElementById('prev-image-btn').addEventListener('click', () => navigateImageViewer('prev'));
+    document.getElementById('next-image-btn').addEventListener('click', () => navigateImageViewer('next'));
+    document.getElementById('image-viewer-modal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('image-viewer-modal')) {
+            closeImageViewer();
+        }
+    });
+    
+    // Eventos de teclado
+    document.addEventListener('keydown', (e) => {
+    if (!document.getElementById('image-viewer-modal').classList.contains('hidden')) {
+        const now = Date.now();
+        if (now - state.lastKeyPressTime < 50) return; // Debounce de 50ms
+        
+        state.lastKeyPressTime = now;
+        
+        if (e.key === 'Escape') {
+            closeImageViewer();
+        } else if (e.key === 'ArrowLeft') {
+            navigateImageViewer('prev');
+        } else if (e.key === 'ArrowRight') {
+            navigateImageViewer('next');
+        }
+    }
+ });
  
     // Eventos del botón de configuración
     configBtn.addEventListener('click', openConfigModal);
@@ -336,7 +369,7 @@ function addPoint(relativeX, relativeY) {
         number: pointNumber,
         x: relativeX,
         y: relativeY,
-        title: `Punto ${pointNumber}`,
+        title: '',
         description: '',
         imageDataUrl: null
     };
@@ -605,7 +638,10 @@ function showPointDetails(pointId) {
     
     // Actualizar el contenido del panel con las nuevas clases y botones
     const html = `
-        <h3>${point.title}</h3>
+        <div class="point-header">
+    		<div class="point-number">Punto ${point.number}</div>
+    		<h3>${point.title}</h3>
+	</div>
         ${point.imageDataUrl ? `
             <img src="${point.imageDataUrl}" 
          	 class="point-details-image" 
@@ -851,6 +887,7 @@ function openPointModal(pointId, editMode = false) {
     
     // Llenar los datos en el modal
     pointTitle.textContent = point.title;
+    document.querySelector('.point-number').textContent = `Punto ${point.number}`;
     pointDescription.textContent = point.description;
     
     // Manejar la imagen si existe
@@ -886,6 +923,7 @@ function switchToEditMode() {
     
     // Llenar los campos de edición
     pointTitleInput.value = point.title;
+    document.querySelector('.point-number').textContent = `Punto ${point.number}`;
     pointDescInput.value = point.description;
     
     // Manejar la imagen
@@ -908,7 +946,7 @@ function savePointData() {
     if (pointIndex === -1) return;
     
     // Actualizar datos en el estado
-    state.points[pointIndex].title = pointTitleInput.value.trim() || `Punto ${state.points[pointIndex].number}`;
+    state.points[pointIndex].title = pointTitleInput.value.trim();
     state.points[pointIndex].description = pointDescInput.value.trim();
     state.points[pointIndex].imageDataUrl = state.currentPointImageDataUrl;
     
@@ -959,6 +997,61 @@ function removePointHighlight() {
     document.querySelectorAll('.point').forEach(el => {
         el.classList.remove('highlight');
     });
+}
+
+/**
+ * Visor de imágenes ampliadas
+ */
+function openImageViewer(pointId) {
+    const point = state.points.find(p => p.id === pointId);
+    if (!point || !point.imageDataUrl) return;
+    
+    state.currentViewerPointId = pointId;
+    
+    // Configurar el visor
+    document.getElementById('viewer-point-title').textContent = `Punto ${point.number}`;
+    const viewerImage = document.getElementById('viewer-image');
+    viewerImage.src = point.imageDataUrl;
+    
+    // Mostrar modal
+    const modal = document.getElementById('image-viewer-modal');
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    
+    // Enfocar el modal para eventos de teclado
+    modal.focus();
+    
+    // Resaltar el punto actual
+    highlightPoint(pointId);
+}
+
+function closeImageViewer() {
+    document.getElementById('image-viewer-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+    removePointHighlight();
+}
+
+function navigateImageViewer(direction) {
+    if (!state.currentViewerPointId) return;
+    
+    const currentIndex = state.points.findIndex(p => p.id === state.currentViewerPointId);
+    if (currentIndex === -1) return;
+    
+    // Encontrar todos los puntos con imágenes
+    const pointsWithImages = state.points.filter(p => p.imageDataUrl);
+    if (pointsWithImages.length <= 1) return;
+    
+    // Encontrar posición actual en el array filtrado
+    const currentInFiltered = pointsWithImages.findIndex(p => p.id === state.currentViewerPointId);
+    
+    let newIndex;
+    if (direction === 'prev') {
+        newIndex = (currentInFiltered - 1 + pointsWithImages.length) % pointsWithImages.length;
+    } else {
+        newIndex = (currentInFiltered + 1) % pointsWithImages.length;
+    }
+    
+    openImageViewer(pointsWithImages[newIndex].id);
 }
 
 /**
@@ -1036,6 +1129,15 @@ function renumberPoints() {
     if (state.currentPointId) {
         showPointDetails(state.currentPointId);
     }
+
+// Actualizar el número en el modal si está abierto
+if (!pointModal.classList.contains('hidden') && state.currentPointId) {
+    const point = state.points.find(p => p.id === state.currentPointId);
+    if (point) {
+        document.querySelector('.point-number').textContent = `Punto ${point.number}`;
+    }
+}
+
 }
 
 /**
