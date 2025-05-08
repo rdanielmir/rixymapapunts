@@ -169,12 +169,12 @@ body {
     display: block;
     max-width: 150%;
     max-height: 350px;
-    margin: 0 auto 20px auto; /* Centrado con margen inferior */
+    margin: 0 auto 20px auto;
     border-radius: 6px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    object-fit: contain; /* Asegura que la imagen completa sea visible */
-    background-color: #f0f0f0; /* Fondo para imágenes con transparencia */
-    padding: 5px; /* Espacio interno */
+    object-fit: contain;
+    background-color: #f0f0f0;
+    padding: 5px;
 }
 
 .point-description-box {
@@ -182,7 +182,7 @@ body {
     border-radius: 6px;
     padding: 15px;
     margin: 15px 0;
-    border-left: 4px solid #3498db; /* Borde lateral azul para estilo */
+    border-left: 4px solid #3498db;
     font-size: 14px;
     line-height: 1.5;
     color: #333;
@@ -262,39 +262,35 @@ body {
     color: white;                    
     font-weight: bold;               
     font-size: 6px;                 
-
-    padding: 0 !important; /* Elimina cualquier padding */
-    line-height: 1; /* Evita espacio adicional */
-    font-family: Arial, sans-serif; /* Fuente consistente */
-    text-align: center; /* Doble seguridad para centrado */
-    box-sizing: border-box; /* Incluye border en el tamaño total */
+    padding: 0 !important;
+    line-height: 1;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    box-sizing: border-box;
 }
 
 .point::after {
     content: "";
     position: absolute;
-    top: 100%; /* Coloca el triángulo justo debajo del círculo */
+    top: 100%;
     left: 50%;
     transform: translateX(-50%);
     width: 0;
     height: 0;
-    border-left: 2px solid transparent;  /* Mitad del ancho del círculo */
-    border-right: 2px solid transparent; /* Mitad del ancho del círculo */
-    border-top: 2px solid white; 	 /* Altura proporcional, mismo color */
-    pointer-events: none; /* Evita que el triángulo interfiera con los eventos del ratón */
+    border-left: 2px solid transparent;
+    border-right: 2px solid transparent;
+    border-top: 2px solid white;
+    pointer-events: none;
 }
 
 .point:hover {
-    /*transform: scale(1);          				Agranda el punto un (desactivat)% */
-    background-color: #e74c3c;       				/* Cambia el fondo a un rojo más fuerte */
-    z-index: 6;                      				/* Lo pone por encima de los demás puntos */
+    background-color: #e74c3c;
+    z-index: 6;
 }
 
-
 .point.highlight {
-    /*transform: scale(1);           				 Aumenta su tamaño un 30% (desactivat) */
-    background-color: #3498db;       				/* Cambia a azul */
-    z-index: 7;                      				/* Asegura que esté por encima del resto */
+    background-color: #3498db;
+    z-index: 7;
 }
 
 .startup-message {
@@ -427,6 +423,22 @@ textarea {
     display: none;
 }
 
+.hint {
+    display: block;
+    color: #7f8c8d;
+    font-size: 0.8em;
+    margin-top: 4px;
+}
+
+#point-number-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .toolbar {
@@ -486,7 +498,6 @@ textarea {
 
 .point.dragging {
     opacity: 0.8;
-    /*transform: scale(1.3);  */
     z-index: 10;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
 }
@@ -512,7 +523,6 @@ textarea {
 }
 
 /* Estilos para el botón y modal de configuración */
-/* Modal de configuración específico */
 #config-modal .modal-content {
     max-width: 400px;
     padding: 20px;
@@ -555,7 +565,6 @@ textarea {
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 14px;
-
 }
 
 /* Visor de imágenes */
@@ -603,4 +612,56 @@ textarea {
     color: #7f8c8d;
     font-weight: bold;
     margin-bottom: 5px;
+}
+
+/* Estilos para el menú desplegable de guardar */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.dropdown-content a {
+    color: #333;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    font-size: 14px;
+}
+
+.dropdown-content a:hover {
+    background-color: #3498db;
+    color: white;
+}
+
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+
+/* Notificación de guardado */
+.save-notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #2ecc71;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 4px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    z-index: 1000;
+    transition: opacity 0.5s;
+}
+
+.save-notification.fade-out {
+    opacity: 0;
 }
