@@ -51,6 +51,7 @@ const editPointBtn = document.getElementById('edit-point-btn');
 const deletePointBtn = document.getElementById('delete-point-btn');
 const pointTitleInput = document.getElementById('point-title-input');
 const pointDescInput = document.getElementById('point-desc-input');
+const pointNumberInput = document.getElementById('point-number-input');
 const pointImageUpload = document.getElementById('point-image-upload');
 const pointImagePreview = document.getElementById('point-image-preview');
 const removeImageBtn = document.getElementById('remove-image-btn');
@@ -72,6 +73,8 @@ const state = {
     naturalWidth: 0,
     naturalHeight: 0,
 
+    currentProjectPath: null, // Nueva propiedad para ruta del archivo
+    hasUnsavedChanges: false, // Para controlar cambios no guardados
 
     lastKeyPressTime: 0,
     currentViewerPointId: null,
@@ -83,7 +86,7 @@ const state = {
     isDragging: false,
     lastPosX: 0,
     lastPosY: 0,
-    startingPointNumber: 1, // Número inicial para comenzar a numerar los puntos
+    startingPointNumber: 1,
 
     // Control de puntos
     points: [],
@@ -105,20 +108,23 @@ const state = {
     MIN_SCALE: 0.1,
     MAX_SCALE: 10,
     SCALE_FACTOR: 1.2,
-    MAX_IMAGE_SIZE: 800 // Tamaño máximo para redimensionar imágenes
+    MAX_IMAGE_SIZE: 800
 };
 
 /**
  * Funciones de inicialización
  */
 function init() {
+    // Añadir verificación de compatibilidad
+    checkFileSystemCompatibility();
+    
     setupEventListeners();
     
     // Mostrar sidebar por defecto en dispositivos grandes
     if (window.innerWidth > 768) {
         setTimeout(() => {
             showDetailsPanel();
-        }, 10); // Esperar un poco para que todo se inicialice
+        }, 10);
     }
 }
 
@@ -127,6 +133,18 @@ function setupEventListeners() {
     bgUpload.addEventListener('change', handleBackgroundUpload);
     loadUpload.addEventListener('change', handleProjectLoad);
 
+// Modificar el evento de carga de proyecto
+    if (state.hasFileSystemAccess) {
+        // Si el navegador soporta File System Access API, usamos ese método
+        loadUpload.style.display = 'none'; // Ocultamos el input file
+        document.querySelector('.tool-group label[for="load-upload"]').addEventListener('click', (e) => {
+            e.preventDefault();
+            handleProjectLoad();
+        });
+    } else {
+        // Si no soporta la API, usamos el input file tradicional
+        loadUpload.addEventListener('change', handleProjectLoadFallback);
+    }
 
     // Eventos del visor de imágenes
     document.getElementById('close-image-viewer').addEventListener('click', closeImageViewer);
@@ -140,21 +158,21 @@ function setupEventListeners() {
     
     // Eventos de teclado
     document.addEventListener('keydown', (e) => {
-    if (!document.getElementById('image-viewer-modal').classList.contains('hidden')) {
-        const now = Date.now();
-        if (now - state.lastKeyPressTime < 50) return; // Debounce de 50ms
-        
-        state.lastKeyPressTime = now;
-        
-        if (e.key === 'Escape') {
-            closeImageViewer();
-        } else if (e.key === 'ArrowLeft') {
-            navigateImageViewer('prev');
-        } else if (e.key === 'ArrowRight') {
-            navigateImageViewer('next');
+        if (!document.getElementById('image-viewer-modal').classList.contains('hidden')) {
+            const now = Date.now();
+            if (now - state.lastKeyPressTime < 50) return;
+            
+            state.lastKeyPressTime = now;
+            
+            if (e.key === 'Escape') {
+                closeImageViewer();
+            } else if (e.key === 'ArrowLeft') {
+                navigateImageViewer('prev');
+            } else if (e.key === 'ArrowRight') {
+                navigateImageViewer('next');
+            }
         }
-    }
- });
+    });
  
     // Eventos del botón de configuración
     configBtn.addEventListener('click', openConfigModal);
@@ -167,7 +185,7 @@ function setupEventListeners() {
     zoomInBtn.addEventListener('click', () => adjustZoom(state.SCALE_FACTOR));
     zoomOutBtn.addEventListener('click', () => adjustZoom(1 / state.SCALE_FACTOR));
     zoomResetBtn.addEventListener('click', resetZoom);
-    saveBtn.addEventListener('click', saveProject);
+    saveBtn.addEventListener('click', () => saveProject(false));
     toggleDetailsBtn.addEventListener('click', toggleDetailsPanel);
     closeDetailsBtn.addEventListener('click', hideDetailsPanel);
     
@@ -202,7 +220,24 @@ function setupEventListeners() {
     
     // Evento de redimensionamiento de ventana
     window.addEventListener('resize', updateImagePosition);
+
+    // Event listeners para el menú de guardar
+    document.getElementById('save-menu-item').addEventListener('click', (e) => {
+    e.preventDefault();
+    saveProject(false); // Guardar normal
+});
+
+document.getElementById('save-as-menu-item').addEventListener('click', (e) => {
+    e.preventDefault();
+    saveProject(true); // Guardar como
+});
 }
+
+function checkFileSystemCompatibility() {
+    state.hasFileSystemAccess = 'showSaveFilePicker' in window && 'showOpenFilePicker' in window;
+    console.log(`File System Access API ${state.hasFileSystemAccess ? 'soportada' : 'no soportada'}`);
+}
+
 
 /**
  * Manejo de archivos e imágenes
@@ -230,10 +265,8 @@ function loadBackground(dataUrl) {
         state.naturalWidth = backgroundImage.naturalWidth;
         state.naturalHeight = backgroundImage.naturalHeight;
         
-        // Reiniciar zoom y posición
         resetZoom();
         
-        // Mostrar imagen y habilitar controles
         backgroundImage.classList.remove('hidden');
         startupMessage.classList.add('hidden');
         enableControls();
@@ -270,13 +303,11 @@ function processAndResizeImage(file) {
         reader.onload = e => {
             const img = new Image();
             img.onload = () => {
-                // Verificar si necesita redimensionarse
                 if (img.width <= state.MAX_IMAGE_SIZE && img.height <= state.MAX_IMAGE_SIZE) {
-                    resolve(e.target.result); // No es necesario redimensionar
+                    resolve(e.target.result);
                     return;
                 }
                 
-                // Calcular las nuevas dimensiones manteniendo la proporción
                 let newWidth, newHeight;
                 if (img.width > img.height) {
                     newWidth = state.MAX_IMAGE_SIZE;
@@ -286,14 +317,12 @@ function processAndResizeImage(file) {
                     newWidth = (img.width * state.MAX_IMAGE_SIZE) / img.height;
                 }
                 
-                // Crear un canvas para redimensionar
                 const canvas = document.createElement('canvas');
                 canvas.width = newWidth;
                 canvas.height = newHeight;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, newWidth, newHeight);
                 
-                // Convertir a Data URL
                 resolve(canvas.toDataURL(file.type));
             };
             img.onerror = () => {
@@ -326,7 +355,6 @@ function toggleAddPointMode() {
         imageContainer.classList.add('adding-point');
         addPointIndicator.classList.remove('hidden');
         
-        // Activar la previsualización
         imageContainer.addEventListener('mousemove', updatePointPreview);
         pointPreview.classList.remove('hidden');
     } else {
@@ -334,7 +362,6 @@ function toggleAddPointMode() {
         imageContainer.classList.remove('adding-point');
         addPointIndicator.classList.add('hidden');
         
-        // Desactivar la previsualización
         imageContainer.removeEventListener('mousemove', updatePointPreview);
         pointPreview.classList.add('hidden');
     }
@@ -343,17 +370,13 @@ function toggleAddPointMode() {
 function handleImageClick(e) {
     if (!state.backgroundImageLoaded) return;
     
-    // Si estamos en modo añadir punto
     if (state.isAddingPoint) {
-        // Calcular la posición relativa
         const rect = imageWrapper.getBoundingClientRect();
         const offsetX = (e.clientX - rect.left) / (rect.width);
         const offsetY = (e.clientY - rect.top) / (rect.height);
         
-        // Validar que el clic esté dentro de la imagen
         if (offsetX >= 0 && offsetX <= 1 && offsetY >= 0 && offsetY <= 1) {
             addPoint(offsetX, offsetY);
-            // Desactivar modo añadir punto después de añadir uno
             toggleAddPointMode();
         }
     }
@@ -363,7 +386,6 @@ function addPoint(relativeX, relativeY) {
     const pointId = Date.now().toString();
     const pointNumber = state.startingPointNumber + state.points.length;
     
-    // Crear nuevo punto
     const newPoint = {
         id: pointId,
         number: pointNumber,
@@ -374,16 +396,9 @@ function addPoint(relativeX, relativeY) {
         imageDataUrl: null
     };
     
-    // Añadir a la lista de puntos
     state.points.push(newPoint);
-    
-    // Crear y añadir elemento visual
     createPointElement(newPoint);
-    
-    // Mostrar detalles del punto en el sidebar
     showPointDetails(pointId);
-    
-    // Abrir modal para editar el punto (solo la primera vez)
     openPointModal(pointId, true);
 }
 
@@ -398,12 +413,11 @@ function createPointElement(point) {
     pointElement.addEventListener('click', (e) => {
         e.stopPropagation();
         showPointDetails(point.id);
-        showDetailsPanel(); // Asegurarse de que el sidebar esté visible
+        showDetailsPanel();
     });
     
-    // Eventos para arrastrar puntos
     pointElement.addEventListener('mousedown', (e) => {
-        if (e.button === 0) { // Solo botón izquierdo
+        if (e.button === 0) {
             e.stopPropagation();
             startDraggingPoint(point.id, e);
         }
@@ -425,7 +439,6 @@ function updatePointPreview(e) {
     const offsetX = (e.clientX - rect.left) / rect.width;
     const offsetY = (e.clientY - rect.top) / rect.height;
     
-    // Validar que esté dentro de la imagen
     if (offsetX >= 0 && offsetX <= 1 && offsetY >= 0 && offsetY <= 1) {
         pointPreview.style.left = `${offsetX * 100}%`;
         pointPreview.style.top = `${offsetY * 100}%`;
@@ -439,11 +452,9 @@ function updatePointPosition(pointId, relativeX, relativeY) {
     const pointIndex = state.points.findIndex(p => p.id === pointId);
     if (pointIndex === -1) return;
     
-    // Actualizar en el estado
     state.points[pointIndex].x = relativeX;
     state.points[pointIndex].y = relativeY;
     
-    // Actualizar visualmente
     const pointElement = document.getElementById(`point-${pointId}`);
     if (pointElement) {
         pointElement.style.left = `${relativeX * 100}%`;
@@ -452,19 +463,16 @@ function updatePointPosition(pointId, relativeX, relativeY) {
 }
 
 function removePoint(pointId) {
-    // Eliminar del DOM
     const pointElement = document.getElementById(`point-${pointId}`);
     if (pointElement) {
         pointElement.remove();
     }
     
-    // Eliminar del estado
     const pointIndex = state.points.findIndex(p => p.id === pointId);
     if (pointIndex !== -1) {
         state.points.splice(pointIndex, 1);
     }
     
-    // Renumerar los puntos restantes
     state.points.forEach((point, index) => {
         point.number = state.startingPointNumber + index;
         const element = document.getElementById(`point-${point.id}`);
@@ -473,17 +481,13 @@ function removePoint(pointId) {
         }
     });
     
-    // Actualizar controles de navegación
     updateNavigationControls();
     
-    // Si el punto eliminado era el que se mostraba en el panel
     if (state.currentPointId === pointId) {
         state.currentPointId = null;
         if (state.points.length > 0) {
-            // Mostrar el primer punto disponible
             showPointDetails(state.points[0].id);
         } else {
-            // No hay puntos, mostrar mensaje
             pointDetailsContent.innerHTML = '<div class="empty-details-message">No hay puntos creados todavía</div>';
         }
     }
@@ -493,10 +497,8 @@ function removePoint(pointId) {
  * Arrastrar puntos
  */
 function startDraggingPoint(pointId, e) {
-    // Todavía no activamos el arrastre, solo guardamos el estado inicial
     state.draggedPointId = pointId;
     
-    // Guardar la posición inicial del cursor o toque
     if (e.touches) {
         state.dragStartX = e.touches[0].clientX;
         state.dragStartY = e.touches[0].clientY;
@@ -505,9 +507,6 @@ function startDraggingPoint(pointId, e) {
         state.dragStartY = e.clientY;
     }
     
-    // No activamos la clase de arrastre todavía
-    
-    // Detener eventos de arrastre de imagen
     e.preventDefault();
 }
 
@@ -516,7 +515,6 @@ function handlePointDragMove(e) {
     
     e.preventDefault();
     
-    // Obtener coordenadas actuales
     let clientX, clientY;
     if (e.touches) {
         clientX = e.touches[0].clientX;
@@ -526,28 +524,22 @@ function handlePointDragMove(e) {
         clientY = e.clientY;
     }
     
-    // Calcular la distancia movida
     const deltaX = Math.abs(clientX - state.dragStartX);
     const deltaY = Math.abs(clientY - state.dragStartY);
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     
-    // Si superamos el umbral, activar el arrastre
     if (!state.isDraggingPoint && distance > state.dragThreshold) {
         state.isDraggingPoint = true;
         const pointElement = document.getElementById(`point-${state.draggedPointId}`);
         pointElement.classList.add('dragging');
     }
     
-    // Solo actualizar la posición si estamos arrastrando realmente
     if (state.isDraggingPoint) {
-        // Calcular la posición relativa
         const rect = imageWrapper.getBoundingClientRect();
         const offsetX = (clientX - rect.left) / rect.width;
         const offsetY = (clientY - rect.top) / rect.height;
         
-        // Validar que el punto esté dentro de la imagen
         if (offsetX >= 0 && offsetX <= 1 && offsetY >= 0 && offsetY <= 1) {
-            // Actualizar visualmente la posición mientras se arrastra
             const pointElement = document.getElementById(`point-${state.draggedPointId}`);
             pointElement.style.left = `${offsetX * 100}%`;
             pointElement.style.top = `${offsetY * 100}%`;
@@ -558,23 +550,17 @@ function handlePointDragMove(e) {
 function endDraggingPoint() {
     if (!state.draggedPointId) return;
     
-    // Solo actualizamos la posición si realmente estábamos arrastrando
     if (state.isDraggingPoint) {
         const pointElement = document.getElementById(`point-${state.draggedPointId}`);
         
-        // Calcular la posición final
         const rect = imageWrapper.getBoundingClientRect();
         const left = parseFloat(pointElement.style.left) / 100;
         const top = parseFloat(pointElement.style.top) / 100;
         
-        // Actualizar el punto en el estado
         updatePointPosition(state.draggedPointId, left, top);
-        
-        // Quitar clase de arrastre
         pointElement.classList.remove('dragging');
     }
     
-    // Limpiar estado de arrastre
     state.isDraggingPoint = false;
     state.draggedPointId = null;
     state.dragStartX = 0;
@@ -595,21 +581,17 @@ function toggleDetailsPanel() {
 function showDetailsPanel() {
     pointDetailsSidebar.classList.remove('hidden');
     
-    // En móvil usamos una clase para animación en CSS
     if (window.innerWidth <= 768) {
         pointDetailsSidebar.classList.add('visible');
     }
     
     state.detailsVisible = true;
     
-    // Si hay un punto seleccionado, mostrarlo
     if (state.currentPointId) {
         showPointDetails(state.currentPointId);
     } else if (state.points.length > 0) {
-        // Mostrar el primer punto si hay puntos pero ninguno seleccionado
         showPointDetails(state.points[0].id);
     } else {
-        // No hay puntos, mostrar mensaje
         pointDetailsContent.innerHTML = '<div class="empty-details-message">No hay puntos creados todavía</div>';
     }
 }
@@ -617,7 +599,6 @@ function showDetailsPanel() {
 function hideDetailsPanel() {
     if (window.innerWidth <= 768) {
         pointDetailsSidebar.classList.remove('visible');
-        // Dar tiempo a la animación antes de ocultar
         setTimeout(() => {
             if (!state.detailsVisible) {
                 pointDetailsSidebar.classList.add('hidden');
@@ -636,19 +617,18 @@ function showPointDetails(pointId) {
     
     state.currentPointId = pointId;
     
-    // Actualizar el contenido del panel con las nuevas clases y botones
     const html = `
         <div class="point-header">
-    		<div class="point-number">Punto ${point.number}</div>
-    		<h3>${point.title}</h3>
-	</div>
+            <div class="point-number">Punto ${point.number}</div>
+            <h3>${point.title}</h3>
+        </div>
         ${point.imageDataUrl ? `
             <img src="${point.imageDataUrl}" 
-         	 class="point-details-image" 
-         	 alt="${point.title}"
-         	 id="details-image-${point.id}"
-         	 style="cursor: pointer">
-	` : ''}
+                 class="point-details-image" 
+                 alt="${point.title}"
+                 id="details-image-${point.id}"
+                 style="cursor: pointer">
+        ` : ''}
         <div class="point-description-box">
             ${point.description || 'Sin descripción'}
         </div>
@@ -660,19 +640,15 @@ function showPointDetails(pointId) {
     
     pointDetailsContent.innerHTML = html;
     
-    // Añadir event listeners a los nuevos botones
     document.getElementById('edit-point-sidebar-btn').addEventListener('click', () => {
         openPointModal(pointId, true);
     });
     
     document.getElementById('delete-point-sidebar-btn').addEventListener('click', confirmDeletePoint);
     
-    // Actualizar controles de navegación
     updateNavigationControls();
-    
-    // Resaltar el punto en la imagen
     highlightPoint(pointId);
-    // Hacer la imagen clicable
+    
     if (point.imageDataUrl) {
         const detailsImage = document.getElementById(`details-image-${point.id}`);
         if (detailsImage) {
@@ -724,11 +700,9 @@ function handleMouseWheel(e) {
     
     e.preventDefault();
     
-    // Determinar dirección y factor de zoom
     const direction = e.deltaY < 0 ? 1 : -1;
     const factor = direction > 0 ? state.SCALE_FACTOR : 1 / state.SCALE_FACTOR;
     
-    // Calcular punto de origen para zoom (posición del cursor)
     const rect = imageContainer.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -737,25 +711,17 @@ function handleMouseWheel(e) {
 }
 
 function applyZoom(factor, originX, originY) {
-    // Guardar escala actual para calcular el cambio
     const prevScale = state.scale;
-    
-    // Aplicar factor de zoom
     state.scale *= factor;
-    
-    // Limitar escala a valores mínimo y máximo
     state.scale = Math.max(state.MIN_SCALE, Math.min(state.MAX_SCALE, state.scale));
     
-    // Si no hubo cambio, salir
     if (prevScale === state.scale) return;
     
-    // Calcular el cambio en offset para mantener el punto de origen fijo
     const scaleFactor = state.scale / prevScale;
     const containerWidth = imageContainer.offsetWidth;
     const containerHeight = imageContainer.offsetHeight;
     
     if (originX !== undefined && originY !== undefined) {
-        // Calcular nuevos offsets respecto al punto de origen
         const dx = (originX - containerWidth / 2);
         const dy = (originY - containerHeight / 2);
         
@@ -767,7 +733,6 @@ function applyZoom(factor, originX, originY) {
 }
 
 function adjustZoom(factor) {
-    // Calcular punto de origen como centro del contenedor
     const containerWidth = imageContainer.offsetWidth;
     const containerHeight = imageContainer.offsetHeight;
     
@@ -782,7 +747,6 @@ function resetZoom() {
 }
 
 function updateImagePosition() {
-    // Aplicar transformación al contenedor de la imagen
     imageWrapper.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
 }
 
@@ -823,15 +787,12 @@ function handleDragMove(e) {
     
     e.preventDefault();
     
-    // Calcular el desplazamiento
     const deltaX = e.clientX - state.lastPosX;
     const deltaY = e.clientY - state.lastPosY;
     
-    // Actualizar la posición
     state.offsetX += deltaX;
     state.offsetY += deltaY;
     
-    // Guardar la nueva posición del cursor
     state.lastPosX = e.clientX;
     state.lastPosY = e.clientY;
     
@@ -849,15 +810,12 @@ function handleTouchMove(e) {
     e.preventDefault();
     
     if (e.touches.length === 1) {
-        // Calcular el desplazamiento
         const deltaX = e.touches[0].clientX - state.lastPosX;
         const deltaY = e.touches[0].clientY - state.lastPosY;
         
-        // Actualizar la posición
         state.offsetX += deltaX;
         state.offsetY += deltaY;
         
-        // Guardar la nueva posición del cursor
         state.lastPosX = e.touches[0].clientX;
         state.lastPosY = e.touches[0].clientY;
         
@@ -885,12 +843,14 @@ function openPointModal(pointId, editMode = false) {
     state.currentPointId = pointId;
     state.currentPointImageDataUrl = point.imageDataUrl;
     
-    // Llenar los datos en el modal
     pointTitle.textContent = point.title;
     document.querySelector('.point-number').textContent = `Punto ${point.number}`;
     pointDescription.textContent = point.description;
     
-    // Manejar la imagen si existe
+    if (editMode && point.title === '') {
+        document.getElementById('point-number-input').value = '';
+    }
+    
     if (point.imageDataUrl) {
         pointImageView.src = point.imageDataUrl;
         pointImageView.classList.remove('hidden');
@@ -898,17 +858,14 @@ function openPointModal(pointId, editMode = false) {
         pointImageView.classList.add('hidden');
     }
     
-    // Mostrar modal
     pointModal.classList.remove('hidden');
     
-    // Mostrar en modo edición si se solicita
     if (editMode) {
         switchToEditMode();
     } else {
         switchToViewMode();
     }
     
-    // Resaltar el punto en la imagen
     highlightPoint(pointId);
 }
 
@@ -921,12 +878,11 @@ function switchToEditMode() {
     const point = state.points.find(p => p.id === state.currentPointId);
     if (!point) return;
     
-    // Llenar los campos de edición
     pointTitleInput.value = point.title;
     document.querySelector('.point-number').textContent = `Punto ${point.number}`;
     pointDescInput.value = point.description;
+    document.getElementById('point-number-input').value = point.number;
     
-    // Manejar la imagen
     if (point.imageDataUrl) {
         pointImagePreview.src = point.imageDataUrl;
         pointImagePreview.classList.remove('hidden');
@@ -936,26 +892,114 @@ function switchToEditMode() {
         removeImageBtn.classList.add('hidden');
     }
     
-    // Mostrar modo edición
     pointViewMode.classList.add('hidden');
     pointEditMode.classList.remove('hidden');
+}
+
+function renumberPointsAfter(newNumber) {
+    const affectedPoints = state.points.filter(p => p.number >= newNumber);
+    affectedPoints.sort((a, b) => b.number - a.number);
+    
+    // Incrementar números
+    affectedPoints.forEach(point => {
+        point.number += 1;
+        const element = document.getElementById(`point-${point.id}`);
+        if (element) {
+            element.innerHTML = point.number;
+        }
+    });
+
+    // Reordenar el array state.points según el número
+    state.points.sort((a, b) => a.number - b.number);
 }
 
 function savePointData() {
     const pointIndex = state.points.findIndex(p => p.id === state.currentPointId);
     if (pointIndex === -1) return;
-    
-    // Actualizar datos en el estado
-    state.points[pointIndex].title = pointTitleInput.value.trim();
-    state.points[pointIndex].description = pointDescInput.value.trim();
-    state.points[pointIndex].imageDataUrl = state.currentPointImageDataUrl;
-    
-    // Actualizar panel de detalles
-    if (state.detailsVisible) {
-        showPointDetails(state.currentPointId);
+
+    const numberInput = document.getElementById('point-number-input');
+    const newNumberStr = numberInput.value.trim();
+    if (newNumberStr === '' || isNaN(parseInt(newNumberStr)) || parseInt(newNumberStr) < 1) {
+        alert('Por favor, introduce un número válido mayor que cero.');
+        return;
     }
+    const newNumber = parseInt(newNumberStr);
+
+    const existingPoint = state.points.find(p => p.number === newNumber && p.id !== state.currentPointId);
+    if (existingPoint) {
+        confirmTitle.textContent = 'Conflicto de numeración';
+        confirmMessage.textContent = `El número ${newNumber} ya está asignado a otro punto. ¿Quieres reasignar los números?`;
+
+        state.confirmCallback = () => {
+            // Guardar ID para asegurarnos de tener referencia tras reordenar
+            const currentPointId = state.currentPointId;
+            
+            renumberPointsAfter(newNumber);
+            state.points[pointIndex].number = newNumber;
+            state.points.sort((a, b) => a.number - b.number);
+            
+            // Buscar el nuevo índice después de ordenar
+            const newPointIndex = state.points.findIndex(p => p.id === currentPointId);
+            updatePointAfterSave(newPointIndex);
+            
+            // Actualizar visualmente el elemento del punto
+            const pointElement = document.getElementById(`point-${currentPointId}`);
+            if (pointElement) {
+                pointElement.innerHTML = newNumber;
+            }
+            
+            closePointModal();
+        };
+
+        showConfirmModal();
+        return;
+    }
+
+    // Guardar el número antiguo y el ID para comparar después
+    const currentPointId = state.currentPointId;
+    const oldNumber = state.points[pointIndex].number;
     
-    // Cerrar el modal después de guardar
+    // Actualizar el número y reordenar
+    state.points[pointIndex].number = newNumber;
+    state.points.sort((a, b) => a.number - b.number);
+    
+    // Buscar el nuevo índice después de ordenar
+    const newPointIndex = state.points.findIndex(p => p.id === currentPointId);
+    updatePointAfterSave(newPointIndex);
+    
+    // Actualizar visualmente el elemento del punto, asegurándose que muestre el nuevo número
+    const pointElement = document.getElementById(`point-${currentPointId}`);
+    if (pointElement) {
+        pointElement.innerHTML = newNumber;
+    }
+}
+
+
+function updatePointAfterSave(pointIndex) {
+    const point = state.points[pointIndex];
+
+    // Actualizar datos del punto
+    point.title = pointTitleInput.value.trim();
+    point.description = pointDescInput.value.trim();
+    point.imageDataUrl = state.currentPointImageDataUrl;
+
+    // Actualizar número en el círculo (DOM del punto visual)
+    const pointElement = document.getElementById(`point-${point.id}`);
+    if (pointElement) {
+        pointElement.innerHTML = point.number;
+    }
+
+    // Actualizar número en el modal
+    const pointNumberLabel = document.querySelector('.point-number');
+    if (pointNumberLabel) {
+        pointNumberLabel.textContent = `Punto ${point.number}`;
+    }
+
+    // Actualizar panel lateral si está visible
+    if (state.detailsVisible) {
+        showPointDetails(point.id);
+    }
+
     closePointModal();
 }
 
@@ -976,16 +1020,11 @@ function closePointModal() {
     pointModal.classList.add('hidden');
     state.currentPointId = null;
     state.currentPointImageDataUrl = null;
-    
-    // Quitar resaltado del punto
     removePointHighlight();
 }
 
 function highlightPoint(pointId) {
-    // Quitar cualquier resaltado previo
     removePointHighlight();
-    
-    // Resaltar el punto en la imagen
     const pointElement = document.getElementById(`point-${pointId}`);
     if (pointElement) {
         pointElement.classList.add('highlight');
@@ -993,7 +1032,6 @@ function highlightPoint(pointId) {
 }
 
 function removePointHighlight() {
-    // Quitar resaltado de todos los puntos
     document.querySelectorAll('.point').forEach(el => {
         el.classList.remove('highlight');
     });
@@ -1008,20 +1046,14 @@ function openImageViewer(pointId) {
     
     state.currentViewerPointId = pointId;
     
-    // Configurar el visor
     document.getElementById('viewer-point-title').textContent = `Punto ${point.number}`;
     const viewerImage = document.getElementById('viewer-image');
     viewerImage.src = point.imageDataUrl;
     
-    // Mostrar modal
     const modal = document.getElementById('image-viewer-modal');
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
-    
-    // Enfocar el modal para eventos de teclado
     modal.focus();
-    
-    // Resaltar el punto actual
     highlightPoint(pointId);
 }
 
@@ -1037,11 +1069,9 @@ function navigateImageViewer(direction) {
     const currentIndex = state.points.findIndex(p => p.id === state.currentViewerPointId);
     if (currentIndex === -1) return;
     
-    // Encontrar todos los puntos con imágenes
     const pointsWithImages = state.points.filter(p => p.imageDataUrl);
     if (pointsWithImages.length <= 1) return;
     
-    // Encontrar posición actual en el array filtrado
     const currentInFiltered = pointsWithImages.findIndex(p => p.id === state.currentViewerPointId);
     
     let newIndex;
@@ -1077,10 +1107,7 @@ function handleConfirmYes() {
  * Gestión del modal de configuración
  */
 function openConfigModal() {
-    // Establecer el valor actual en el input
     startingNumberInput.value = state.startingPointNumber;
-    
-    // Mostrar modal
     configModal.classList.remove('hidden');
 }
 
@@ -1089,17 +1116,14 @@ function closeConfigModal() {
 }
 
 function saveConfig() {
-    // Obtener y validar el número inicial
     const startingNumber = parseInt(startingNumberInput.value, 10);
     if (isNaN(startingNumber) || startingNumber < 1) {
         alert('Por favor, introduce un número válido mayor o igual a 1.');
         return;
     }
     
-    // Guardar la configuración
     state.startingPointNumber = startingNumber;
     
-    // Si ya hay puntos, preguntar si quiere renumerarlos
     if (state.points.length > 0) {
         confirmTitle.textContent = 'Renumerar puntos';
         confirmMessage.textContent = '¿Quieres renumerar los puntos existentes con la nueva numeración?';
@@ -1116,7 +1140,6 @@ function saveConfig() {
 }
 
 function renumberPoints() {
-    // Renumerar todos los puntos
     state.points.forEach((point, index) => {
         point.number = state.startingPointNumber + index;
         const element = document.getElementById(`point-${point.id}`);
@@ -1125,19 +1148,16 @@ function renumberPoints() {
         }
     });
     
-    // Actualizar el panel de detalles si es necesario
     if (state.currentPointId) {
         showPointDetails(state.currentPointId);
     }
 
-// Actualizar el número en el modal si está abierto
-if (!pointModal.classList.contains('hidden') && state.currentPointId) {
-    const point = state.points.find(p => p.id === state.currentPointId);
-    if (point) {
-        document.querySelector('.point-number').textContent = `Punto ${point.number}`;
+    if (!pointModal.classList.contains('hidden') && state.currentPointId) {
+        const point = state.points.find(p => p.id === state.currentPointId);
+        if (point) {
+            document.querySelector('.point-number').textContent = `Punto ${point.number}`;
+        }
     }
-}
-
 }
 
 /**
@@ -1153,49 +1173,177 @@ function enableControls() {
 }
 
 /**
- * Persistencia (guardar/cargar)
+ * Persistencia (guardar/cargar) - VERSIÓN CORREGIDA
  */
-function saveProject() {
-    if (!state.backgroundImageLoaded) return;
-    
+async function saveProject(saveAs = false) {
+    if (!state.backgroundImageLoaded) {
+        alert("Primero carga una imagen de fondo.");
+        return;
+    }
+
+    if (!state.hasFileSystemAccess) {
+        alert("Tu navegador no permite guardar directamente. Usa Chrome/Edge.");
+        return;
+    }
+
     const projectData = {
-        version: '1.0',
         backgroundImage: state.backgroundDataUrl,
-        startingPointNumber: state.startingPointNumber, // Añadir número inicial
-        points: state.points.map(point => ({
-            id: point.id,
-            number: point.number,
-            x: point.x,
-            y: point.y,
-            title: point.title,
-            description: point.description,
-            imageDataUrl: point.imageDataUrl
-        }))
+        startingPointNumber: state.startingPointNumber,
+        points: state.points
     };
-    
-    // Convertir a JSON
-    const jsonData = JSON.stringify(projectData);
-    
-    // Crear un elemento de descarga
-    const a = document.createElement('a');
-    const blob = new Blob([jsonData], { type: 'application/json' });
+
+    try {
+        let fileHandle;
+        
+        // Si es "Guardar" y ya existe un archivo, úsalo
+        if (!saveAs && state.currentProjectPath) {
+            fileHandle = state.currentProjectPath;
+        } 
+        // Si es "Guardar como" o no hay archivo, crea uno nuevo
+        else {
+            fileHandle = await window.showSaveFilePicker({
+                types: [{
+                    description: 'Archivos de proyecto',
+                    accept: { 'application/json': ['.json'] }
+                }],
+                suggestedName: `proyecto_puntos_${Date.now()}.json`
+            });
+            state.currentProjectPath = fileHandle;
+        }
+
+        // Escribe el archivo
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(projectData));
+        await writable.close();
+
+        showSaveSuccess();
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            console.error("Error al guardar:", error);
+            alert("No se pudo guardar el proyecto.");
+        }
+    }
+}
+
+
+/**
+ * Guardar proyecto en un archivo existente usando File System Access API
+ */
+async function saveToExistingFile(fileHandle, content) {
+    try {
+        // Crear un FileSystemWritableFileStream para escribir
+        const writable = await fileHandle.createWritable();
+        // Escribir el contenido
+        await writable.write(content);
+        // Cerrar el archivo
+        await writable.close();
+        return true;
+    } catch (error) {
+        console.error('Error al guardar archivo:', error);
+        throw error;
+    }
+}
+
+/**
+ * Guardar como nuevo archivo usando File System Access API
+ */
+async function saveAsNewFile(content) {
+    try {
+        // Mostrar el diálogo de guardado de archivo
+        const fileHandle = await window.showSaveFilePicker({
+            types: [{
+                description: 'Archivos de proyecto',
+                accept: {
+                    'application/json': ['.json']
+                }
+            }],
+            suggestedName: `punto_interactivo_${Date.now()}.json`
+        });
+        
+        // Guardar el archivo
+        await saveToExistingFile(fileHandle, content);
+        
+        // Actualizar estado
+        state.currentProjectPath = fileHandle;
+        state.hasUnsavedChanges = false;
+        showSaveSuccess();
+    } catch (error) {
+        // El usuario canceló el diálogo
+        if (error.name !== 'AbortError') {
+            console.error('Error al guardar:', error);
+            alert('Error al guardar el proyecto. Por favor, inténtalo de nuevo.');
+        }
+    }
+}
+
+function exportProject() {
+    const data = JSON.stringify({
+        backgroundImage: state.backgroundDataUrl,
+        points: state.points
+    });
+    const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+    const a = document.createElement('a');
     a.href = url;
-    a.download = `punto_interactivo_${Date.now()}.json`;
+    a.download = `proyecto_puntos_${Date.now()}.json`;
     a.click();
-    
     URL.revokeObjectURL(url);
 }
 
-function handleProjectLoad(e) {
+/**
+ * Manejar la carga de un proyecto - VERSIÓN CORREGIDA
+ */
+async function handleProjectLoad() {
+    try {
+        const [fileHandle] = await window.showOpenFilePicker({
+            types: [{
+                description: 'Archivos de proyecto',
+                accept: { 'application/json': ['.json'] }
+            }]
+        });
+
+        const file = await fileHandle.getFile();
+        const content = await file.text();
+        const projectData = JSON.parse(content);
+
+        state.currentProjectPath = fileHandle;
+        loadProject(projectData);
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            console.error("Error al cargar:", error);
+            alert("No se pudo cargar el proyecto. Asegúrate de seleccionar un archivo válido.");
+        }
+    }
+}
+
+/**
+ * Función auxiliar para leer un archivo y cargar el proyecto
+ */
+function readFileAndLoadProject(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const projectData = JSON.parse(event.target.result);
+                loadProject(projectData);
+                state.hasUnsavedChanges = false;
+                resolve(true);
+            } catch (error) {
+                console.error('Error al parsear el proyecto:', error);
+                alert('Error al cargar el proyecto. El archivo parece estar corrupto.');
+                reject(error);
+            }
+        };
+        reader.onerror = reject;
+        reader.readAsText(file);
+    });
+}
+
+
+// Añadir esta nueva función para el fallback con input file
+function handleProjectLoadFallback(e) {
     const file = e.target.files[0];
     if (!file) return;
-    
-    if (file.type !== 'application/json') {
-        alert('Por favor, selecciona un archivo JSON válido.');
-        return;
-    }
     
     const reader = new FileReader();
     reader.onload = function(event) {
@@ -1207,7 +1355,26 @@ function handleProjectLoad(e) {
             alert('Error al cargar el proyecto. El archivo parece estar corrupto.');
         }
     };
+    reader.onerror = function() {
+        alert('Error al leer el archivo. Por favor, inténtalo de nuevo.');
+    };
     reader.readAsText(file);
+    
+    // Limpiar el input para permitir cargar el mismo archivo otra vez si es necesario
+    e.target.value = '';
+}
+
+// Función para mostrar éxito en guardado
+function showSaveSuccess() {
+    const notification = document.createElement('div');
+    notification.className = 'save-notification';
+    notification.textContent = 'Proyecto guardado correctamente';
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.classList.add('fade-out');
+        setTimeout(() => notification.remove(), 500);
+    }, 2000);
 }
 
 function loadProject(projectData) {
@@ -1216,19 +1383,14 @@ function loadProject(projectData) {
         return;
     }
     
-    // Limpiar puntos actuales
     pointsContainer.innerHTML = '';
     state.points = [];
-    
-    // Cargar imagen de fondo
     loadBackground(projectData.backgroundImage);
     
-    // Cargar número inicial si existe
     if (projectData.startingPointNumber) {
         state.startingPointNumber = projectData.startingPointNumber;
     }
     
-    // Cargar puntos
     if (projectData.points && Array.isArray(projectData.points)) {
         projectData.points.forEach(point => {
             state.points.push({
@@ -1240,12 +1402,17 @@ function loadProject(projectData) {
                 description: point.description,
                 imageDataUrl: point.imageDataUrl
             });
-            
+        });
+
+        // Ordenar puntos por número al cargar
+        state.points.sort((a, b) => a.number - b.number);
+        
+        // Crear elementos después de ordenar
+        state.points.forEach(point => {
             createPointElement(point);
         });
     }
     
-    // Mostrar detalles del primer punto si hay puntos
     if (state.points.length > 0) {
         showPointDetails(state.points[0].id);
     }
